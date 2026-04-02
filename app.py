@@ -185,11 +185,17 @@ def build_pdf(d):
     story.append(Spacer(1, 3*mm))
     story.append(Paragraph('Vertraulicher Bericht für Gesellschafter / Beirat', sMeta))
     story.append(Paragraph('nova:med GmbH & Co. KG · Höchstadt a. d. Aisch', sMeta))
-    story.append(Paragraph('Erstellt: April 2026', sMeta))
+    story.append(Paragraph(f"Erstellt: {d.get('erstellt', 'April 2026')}", sMeta))
     story.append(Spacer(1, 5*mm))
 
+    monat_kurz = d.get('monat_kurz', MONAT[:3])
+    vorjahr    = d.get('vorjahr', 2025)
+    aktuell_jahr = d.get('aktuell_jahr', 2026)
     kpi = [
-        ['Kennzahl', f'{MONAT}', 'Vorjahr Mrz 2025', 'Plan Mrz 2026', 'Abw. VJ / Plan'],
+        ['Kennzahl', f'{MONAT}',
+         f'Vorjahr {monat_kurz} {vorjahr}',
+         f'Plan {monat_kurz} {aktuell_jahr}',
+         'Abw. VJ / Plan'],
         ['Monatsumsatz', fmtM(u['m']), fmtM(v['m']), fmtM(p['m']),
          f"{sign(pct(u['m'],v['m']))} / {sign(pct(u['m'],p['m']))}"],
         [f'YTD-Umsatz {QUARTAL}', fmtM(q26), fmtM(q25), fmtM(pq),
@@ -236,7 +242,7 @@ def build_pdf(d):
                    sv('v4', fontName='Helvetica-Bold', fontSize=13, textColor=GREEN))],
         [Paragraph(f"Abw. Plan: {sign(pct(u['m'],p['m']))}", sSmall),
          Paragraph('Planzielerreichung', sSmall),
-         Paragraph(f"Mrz 2025: {fmtM(v['m'])}", sSmall),
+         Paragraph(f"{d.get('monat_kurz', MONAT[:3])} {d.get('vorjahr', 2025)}: {fmtM(v['m'])}", sSmall),
          Paragraph(f"Plan: {fmtM(pq)}", sSmall)],
         [Paragraph(f"Plan: {fmtM(p['m'])}", sSmall),
          Paragraph('', sSmall), Paragraph('', sSmall), Paragraph('', sSmall)],
@@ -256,12 +262,20 @@ def build_pdf(d):
 
     story.append(Paragraph(f'<b>Monatliche Umsatzentwicklung {QUARTAL}</b>', sBold))
     story.append(Spacer(1, 2*mm))
-    mon = [['Monat','Umsatz 2026','Umsatz 2025','Plan 2026','Abw. VJ','Abw. Plan']]
-    for m2,a,b,c in [('Jan',u['j'],v['j'],p['j']),
-                     ('Feb',u['f'],v['f'],p['f']),
-                     ('Mrz',u['m'],v['m'],p['m'])]:
+    # Monatsnamen und Quartalslabel dynamisch aus d['monate_labels']
+    monate_labels = d.get('monate_labels', [
+        ['Jan', 'Feb', 'Mrz'], f'{QUARTAL} Gesamt'])
+    mon_zeilen = monate_labels[0]  # ['Jan','Feb','Mrz'] oder ['Apr','Mai','Jun'] etc.
+    quartal_label = monate_labels[1]
+    vorjahr = d.get('vorjahr', 2025)
+    aktuell_jahr = d.get('aktuell_jahr', 2026)
+    mon = [[f'Monat',f'Umsatz {aktuell_jahr}',f'Umsatz {vorjahr}',f'Plan {aktuell_jahr}','Abw. VJ','Abw. Plan']]
+    for m2,a,b,c in zip(mon_zeilen,
+                        [u['j'],u['f'],u['m']],
+                        [v['j'],v['f'],v['m']],
+                        [p['j'],p['f'],p['m']]):
         mon.append([m2, fmt(a), fmt(b), fmt(c), sign(pct(a,b)), sign(pct(a,c))])
-    mon.append(['Q1 Gesamt', fmt(q26), fmt(q25), fmt(pq),
+    mon.append([quartal_label, fmt(q26), fmt(q25), fmt(pq),
                 sign(pct(q26,q25)), sign(pct(q26,pq))])
     story.append(make_table(mon, [cw*0.1, cw*0.18, cw*0.18, cw*0.18, cw*0.18, cw*0.18], [
         ('TEXTCOLOR', (4,1),(5,-1), GREEN),
