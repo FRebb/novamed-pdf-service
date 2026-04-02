@@ -503,6 +503,409 @@ def generate():
         return jsonify({'error': str(e)}), 500
 
 
+# ==============================================================
+# HTML-MAIL AUFBAUEN (alle 6 Kapitel, nova:med Corporate Design)
+# ==============================================================
+def build_html_email(d):
+    G  = '#6aac46'   # R:106 G:172 B:70
+    LG = '#cfe1c3'   # R:207 G:225 B:195
+    SK = '#eff6ee'   # R:239 G:246 B:238
+    R  = '#cc0000'
+    BK = '#1a1a1a'
+
+    MONAT   = d['monat']
+    DATUM   = d['datum']
+    QUARTAL = d['quartal']
+    u=d['u']; v=d['v']; p=d['p']; th=d['th']; epfp=d['epfp']
+    hist=d['hist']; ad=d['ad']
+    q26=d['q26']; q25=d['q25']; pq=d['pq']
+    jsum2025=d['jsum2025total']
+    prog_basis=d['prog_basis']; prog_kons=d['prog_kons']; prog_opt=d['prog_opt']
+    kernaussagen = d.get('kernaussagen', [])
+    k1=d.get('k1',''); k2=d.get('k2',''); k3=d.get('k3','')
+    k4=d.get('k4',''); ka=d.get('ka','')
+    he = d.get('he', [])
+    monat_kurz   = d.get('monat_kurz', MONAT[:3])
+    vorjahr      = d.get('vorjahr', 2025)
+    aktuell_jahr = d.get('aktuell_jahr', 2026)
+    erstellt     = d.get('erstellt', 'April 2026')
+    monate_labels = d.get('monate_labels', [['Jan','Feb','Mrz'], f'{QUARTAL} Gesamt'])
+    mon_zeilen   = monate_labels[0]
+    quartal_label = monate_labels[1]
+
+    def pos(v2): return G if not str(v2).startswith('-') else R
+
+    # ---- CSS ----
+    css = f"""
+<style>
+  body {{ font-family: Arial, sans-serif; font-size: 9pt; color: {BK}; margin: 0; padding: 0; background: #f4f4f4; }}
+  .wrap {{ max-width: 760px; margin: 0 auto; background: #ffffff; }}
+  /* Kopfzeile */
+  .hdr {{ background: {G}; padding: 10px 20px; }}
+  .hdr-inner {{ display: table; width: 100%; }}
+  .hdr-l {{ display: table-cell; color: white; font-size: 9pt; vertical-align: middle; }}
+  .hdr-r {{ display: table-cell; color: white; font-size: 9pt; text-align: right; vertical-align: middle; }}
+  /* Titelblock */
+  .title-block {{ padding: 24px 24px 16px; }}
+  .title-block h1 {{ font-size: 22pt; margin: 0 0 3px; color: {BK}; }}
+  .title-sub {{ font-size: 13pt; color: {G}; margin: 0 0 8px; }}
+  .title-meta {{ font-size: 9pt; color: #555; line-height: 1.6; }}
+  /* Kapitel */
+  .chapter {{ padding: 16px 24px 8px; border-top: 2px solid {G}; margin-top: 8px; }}
+  .chapter h2 {{ font-size: 12pt; font-weight: bold; color: {G}; margin: 0 0 12px; }}
+  .chapter-sub {{ font-size: 10pt; font-weight: bold; color: {BK}; margin: 12px 0 6px; }}
+  /* Tabellen */
+  table.dt {{ width: 100%; border-collapse: collapse; font-size: 8.5pt; margin-bottom: 6px; }}
+  table.dt th {{ background: {G}; color: white; padding: 5px 7px; text-align: left; font-size: 8pt; }}
+  table.dt td {{ padding: 4px 7px; border-bottom: 1px solid #d8d8d8; }}
+  table.dt tr:nth-child(even) td {{ background: {LG}; }}
+  .pos {{ color: {G}; font-weight: bold; }}
+  .neg {{ color: {R}; font-weight: bold; }}
+  .seg {{ color: {G}; font-weight: bold; }}
+  .sub td {{ font-size: 8pt; color: #444; }}
+  .sub td:first-child {{ padding-left: 18px; font-style: italic; }}
+  /* Sub-KPI Box */
+  .kpibox {{ background: {SK}; border: 1px solid #ccc; margin-bottom: 12px; }}
+  .kpibox table {{ width: 100%; border-collapse: collapse; }}
+  .kpibox td {{ padding: 8px 12px; border-right: 1px solid #ccc; vertical-align: top; width: 25%; }}
+  .kpibox td:last-child {{ border-right: none; }}
+  .kv {{ font-size: 13pt; font-weight: bold; color: {G}; display: block; margin: 3px 0 2px; }}
+  .kl {{ font-size: 7pt; text-transform: uppercase; color: #888; letter-spacing: .3px; }}
+  .ks {{ font-size: 7.5pt; color: #555; }}
+  /* Kommentar */
+  .comment {{ font-size: 8.5pt; color: #444; font-style: italic; line-height: 1.6; margin: 8px 0 0; }}
+  .komhd {{ font-size: 10pt; font-weight: bold; margin: 10px 0 3px; }}
+  /* Bullets */
+  .kernhd {{ font-size: 10pt; font-weight: bold; color: {G}; margin: 14px 0 6px; }}
+  .bullet {{ font-size: 9pt; padding: 3px 0; border-bottom: 1px solid #e8e8e8; margin: 0; }}
+  /* Prognose-Boxen */
+  .prog-wrap {{ display: table; width: 100%; border-collapse: separate; border-spacing: 8px; margin: 6px -8px 6px; }}
+  .prog-cell {{ display: table-cell; border-top: 3px solid {G}; border: 1px solid #ddd; padding: 10px 12px; text-align: center; width: 33%; }}
+  .prog-val {{ font-size: 13pt; font-weight: bold; color: {G}; }}
+  .prog-lbl {{ font-size: 8pt; color: #666; margin-bottom: 4px; }}
+  .prog-w {{ font-size: 8.5pt; margin-top: 3px; }}
+  /* Fußzeile */
+  .ftr {{ background: {LG}; padding: 8px 20px; font-size: 7.5pt; color: {BK}; }}
+  .ftr-inner {{ display: table; width: 100%; }}
+  .ftr-l {{ display: table-cell; vertical-align: middle; }}
+  .ftr-r {{ display: table-cell; text-align: right; vertical-align: middle; }}
+  .fn {{ font-size: 7.5pt; color: #888; margin-top: 12px; }}
+</style>"""
+
+    # ---- Kopfzeile ----
+    hdr = f"""<div class="hdr"><div class="hdr-inner">
+  <div class="hdr-l"><b>nova:</b>med</div>
+  <div class="hdr-r">Umsatzbericht {MONAT} I {QUARTAL}</div>
+</div></div>"""
+
+    # ---- Seite 1: Titelseite ----
+    kern_html = ''.join(
+        f'<p class="bullet">· <b>{t}</b> {tx}</p>'
+        for t, tx in kernaussagen)
+
+    s1 = f"""<div class="title-block">
+  <h1>Umsatzbericht</h1>
+  <div class="title-sub">{MONAT} &amp; {QUARTAL}</div>
+  <div class="title-meta">Vertraulicher Bericht für Gesellschafter / Beirat<br>
+  nova:med GmbH &amp; Co. KG · Höchstadt a. d. Aisch<br>
+  Erstellt: {erstellt}</div>
+</div>
+<div class="chapter" style="border-top:none;margin-top:0;padding-top:8px">
+<table class="dt">
+  <thead><tr>
+    <th>Kennzahl</th><th>{MONAT}</th>
+    <th>Vorjahr {monat_kurz} {vorjahr}</th>
+    <th>Plan {monat_kurz} {aktuell_jahr}</th>
+    <th>Abw. VJ / Plan</th>
+  </tr></thead>
+  <tbody>
+    <tr><td>Monatsumsatz</td><td><b>{fmtM(u['m'])}</b></td>
+        <td>{fmtM(v['m'])}</td><td>{fmtM(p['m'])}</td>
+        <td style="color:{pos(sign(pct(u['m'],v['m'])))};font-weight:bold">
+          {sign(pct(u['m'],v['m']))} / {sign(pct(u['m'],p['m']))}</td></tr>
+    <tr><td>YTD-Umsatz {QUARTAL}</td><td><b>{fmtM(q26)}</b></td>
+        <td>{fmtM(q25)}</td><td>{fmtM(pq)}</td>
+        <td style="color:{pos(sign(pct(q26,q25)))};font-weight:bold">
+          {sign(pct(q26,q25))} / {sign(pct(q26,pq))}</td></tr>
+    <tr><td>{QUARTAL} gesamt</td><td><b>{fmtM(q26)}</b></td>
+        <td>{fmtM(q25)}</td><td>—</td>
+        <td style="color:{pos(sign(pct(q26,q25)))};font-weight:bold">
+          {sign(pct(q26,q25))} / —</td></tr>
+  </tbody>
+</table>
+<div class="kernhd">Kernaussagen</div>
+{kern_html}
+</div>"""
+
+    # ---- Seite 2: Monatsumsätze ----
+    mon_rows = ''
+    for m2, a, b, c in zip(mon_zeilen,
+                            [u['j'], u['f'], u['m']],
+                            [v['j'], v['f'], v['m']],
+                            [p['j'], p['f'], p['m']]):
+        dv = sign(pct(a, b)); dp = sign(pct(a, c))
+        mon_rows += (f'<tr><td>{m2}</td><td>{fmt(a)}</td><td>{fmt(b)}</td><td>{fmt(c)}</td>'
+                     f'<td style="color:{pos(dv)};font-weight:bold">{dv}</td>'
+                     f'<td style="color:{pos(dp)};font-weight:bold">{dp}</td></tr>')
+    qvj = sign(pct(q26, q25)); qpl = sign(pct(q26, pq))
+    mon_rows += (f'<tr><td><b>{quartal_label}</b></td><td>{fmt(q26)}</td><td>{fmt(q25)}</td>'
+                 f'<td>{fmt(pq)}</td>'
+                 f'<td style="color:{pos(qvj)};font-weight:bold">{qvj}</td>'
+                 f'<td style="color:{pos(qpl)};font-weight:bold">{qpl}</td></tr>')
+
+    s2 = f"""<div class="chapter">
+<h2>1. Monatsumsätze {QUARTAL} im Detail</h2>
+<div class="kpibox"><table><tr>
+  <td><span class="kl">Umsatz {MONAT}</span>
+      <span class="kv">{fmtM(u['m'])}</span>
+      <span class="ks">Plan: {fmtM(p['m'])}</span></td>
+  <td><span class="kl">Abw. zum Plan</span>
+      <span class="kv" style="color:{G}">{sign(pct(u['m'],p['m']))}</span>
+      <span class="ks">Planzielerreichung</span></td>
+  <td><span class="kl">Abw. zum Vorjahr</span>
+      <span class="kv" style="color:{G}">{sign(pct(u['m'],v['m']))}</span>
+      <span class="ks">{monat_kurz} {vorjahr}: {fmtM(v['m'])}</span></td>
+  <td><span class="kl">YTD-Umsatz {QUARTAL}</span>
+      <span class="kv">{fmtM(q26)}</span>
+      <span class="ks">Plan: {fmtM(pq)}</span></td>
+</tr></table></div>
+<div class="chapter-sub">Monatliche Umsatzentwicklung {QUARTAL}</div>
+<table class="dt">
+  <thead><tr>
+    <th>Monat</th><th>Umsatz {aktuell_jahr}</th><th>Umsatz {vorjahr}</th>
+    <th>Plan {aktuell_jahr}</th><th>Abw. VJ</th><th>Abw. Plan</th>
+  </tr></thead>
+  <tbody>{mon_rows}</tbody>
+</table>
+<div class="komhd">Kommentar</div>
+<div class="comment">{k1}</div>
+</div>"""
+
+    # ---- Seite 3: Langfristentwicklung ----
+    hist_rows = ''
+    for i, h in enumerate(hist):
+        ges = (h['q1']or 0)+(h['q2']or 0)+(h['q3']or 0)+(h['q4']or 0)
+        gs = fmt(h['q1'])+' *' if h['j']==aktuell_jahr else fmt(ges)
+        q1vj = pct(h['q1'], hist[i-1]['q1']) if i > 0 else '—'
+        sv = sign(q1vj) if q1vj != '—' else '—'
+        c = pos(sv) if sv != '—' else BK
+        hist_rows += (f'<tr><td><b>{h["j"]}</b></td><td>{fmt(h["q1"])}</td>'
+                      f'<td>{fmt(h["q2"]) if h["q2"] else "—"}</td>'
+                      f'<td>{fmt(h["q3"]) if h["q3"] else "—"}</td>'
+                      f'<td>{fmt(h["q4"]) if h["q4"] else "—"}</td>'
+                      f'<td><b>{gs}</b></td>'
+                      f'<td style="color:{c};font-weight:bold">{sv}</td></tr>')
+
+    yoy_rows = ''
+    for i in range(1, len(hist)):
+        h = hist[i]; prev = hist[i-1]
+        w = pct(h['q1'], prev['q1']); sv = sign(w)
+        yoy_rows += (f'<tr><td><b>{h["j"]}</b></td><td>{fmt(prev["q1"])}</td>'
+                     f'<td>{fmt(h["q1"])}</td><td>{fmt(h["q1"]-prev["q1"])}</td>'
+                     f'<td style="color:{pos(sv)};font-weight:bold">{sv}</td></tr>')
+
+    s3 = f"""<div class="chapter">
+<h2>2. Quartalsvergleich — Langfristentwicklung</h2>
+<div class="chapter-sub">Umsatz Netto nach Quartal 2021–{aktuell_jahr}</div>
+<table class="dt">
+  <thead><tr><th>Jahr</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Gesamt</th><th>∆ Q1 VJ</th></tr></thead>
+  <tbody>{hist_rows}</tbody>
+</table>
+<p style="font-size:7.5pt;color:#888;margin:3px 0 10px">* {aktuell_jahr}: nur abgeschlossene Quartale (Stand {DATUM})</p>
+<div class="chapter-sub">Q1-Wachstum Year-over-Year</div>
+<table class="dt">
+  <thead><tr><th>Jahr</th><th>Q1 Vorjahr</th><th>Q1 aktuell</th><th>Abs. Differenz</th><th>Wachstum</th></tr></thead>
+  <tbody>{yoy_rows}</tbody>
+</table>
+<div class="komhd">Kommentar</div>
+<div class="comment">{k2}</div>
+</div>"""
+
+    # ---- Seite 4: Therapiegebiete ----
+    th_rows = ''
+    for x in th:
+        dv = sign(pct(x['a'], x['b']))
+        th_rows += (f'<tr><td>{x["n"]}</td><td>{fmt(x["c"])}</td><td>{fmt(x["b"])}</td>'
+                    f'<td>{fmt(x["a"])}</td>'
+                    f'<td style="color:{pos(dv)};font-weight:bold">{dv}</td>'
+                    f'<td>{fmtA(x["ant26"])}</td></tr>')
+    th_rows += (f'<tr><td><b>Gesamt</b></td><td><b>{fmt(5352428)}</b></td>'
+                f'<td><b>{fmt(5997361)}</b></td><td><b>{fmt(8085004)}</b></td>'
+                f'<td style="color:{G};font-weight:bold">+34,8 %</td><td>100,0 %</td></tr>')
+
+    ant_rows = ''
+    for x in th:
+        dv = ppFn(x['ant26'], x['ant25'])
+        ant_rows += (f'<tr><td>{x["n"]}</td><td>{fmtA(x["ant24"])}</td>'
+                     f'<td>{fmtA(x["ant25"])}</td><td>{fmtA(x["ant26"])}</td>'
+                     f'<td style="color:{pos(dv)};font-weight:bold">{dv}</td></tr>')
+
+    s4 = f"""<div class="chapter">
+<h2>3. Umsatz nach Therapiegebiet</h2>
+<table class="dt">
+  <thead><tr>
+    <th>Therapiegebiet</th><th>Q1 {aktuell_jahr-2}</th>
+    <th>Q1 {vorjahr}</th><th>Q1 {aktuell_jahr}</th>
+    <th>∆ {str(vorjahr)[-2:]}→{str(aktuell_jahr)[-2:]}</th><th>Anteil</th>
+  </tr></thead>
+  <tbody>{th_rows}</tbody>
+</table>
+<div class="komhd">Kommentar</div>
+<div class="comment">{k3}</div>
+<div class="chapter-sub" style="margin-top:14px">Umsatzanteile nach Therapiegebiet</div>
+<table class="dt">
+  <thead><tr>
+    <th>Therapiegebiet</th><th>Anteil Q1 {aktuell_jahr-2}</th>
+    <th>Anteil Q1 {vorjahr}</th><th>Anteil Q1 {aktuell_jahr}</th>
+    <th>∆ Anteil (PP)</th>
+  </tr></thead>
+  <tbody>{ant_rows}</tbody>
+</table>
+<p style="font-size:7.5pt;color:#888;margin:3px 0 0">PP = Prozentpunkte · ∆ gegenüber Q1 {vorjahr}</p>
+</div>"""
+
+    # ---- Seite 5: EP/FP/Kauf ----
+    ep_rows = ''
+    for x in epfp:
+        gv = sign(pct(x['ges26'], x['ges25']))
+        ep_rows += (f'<tr><td class="seg">{x["seg"]}</td>'
+                    f'<td class="seg">{fmt(x["ges24"])}</td>'
+                    f'<td class="seg">{fmt(x["ges25"])}</td>'
+                    f'<td class="seg">{fmt(x["ges26"])}</td>'
+                    f'<td style="color:{pos(gv)};font-weight:bold">{gv}</td>'
+                    f'<td class="seg">{fmtA(x["ant"])}</td></tr>')
+        for lbl, k24, k25, k26 in [('EP','ep24','ep25','ep26'),
+                                     ('FP','fp24','fp25','fp26'),
+                                     ('Kauf/WE','kw24','kw25','kw26')]:
+            dv = sign(pct(x[k26], x[k25]))
+            ant = fmtA(x[k26]/x['ges26']*100)
+            ep_rows += (f'<tr class="sub"><td>&nbsp;&nbsp;&nbsp;{lbl}</td>'
+                        f'<td>{fmt(x[k24])}</td><td>{fmt(x[k25])}</td>'
+                        f'<td>{fmt(x[k26])}</td>'
+                        f'<td style="color:{pos(dv)};font-weight:bold">{dv}</td>'
+                        f'<td>{ant}</td></tr>')
+    ep_rows += (f'<tr><td><b>Gesamt (aufgeschl.)</b></td>'
+                f'<td><b>{fmt(5137227)}</b></td><td><b>{fmt(5835890)}</b></td>'
+                f'<td><b>{fmt(7880178)}</b></td>'
+                f'<td style="color:{G};font-weight:bold">+35,0 %</td>'
+                f'<td>100,0 %</td></tr>')
+
+    s5 = f"""<div class="chapter">
+<h2>4. Abrechnungsstruktur nach Therapiegebiet — EP / FP / Kauf/WE</h2>
+<table class="dt" style="table-layout:fixed">
+  <colgroup>
+    <col style="width:28%"><col style="width:14%"><col style="width:14%">
+    <col style="width:14%"><col style="width:16%"><col style="width:14%">
+  </colgroup>
+  <thead><tr>
+    <th>Segment / Abrechnungsart</th>
+    <th>Q1 {aktuell_jahr-2}</th><th>Q1 {vorjahr}</th>
+    <th>Q1 {aktuell_jahr}</th><th>∆ 25→26</th><th>Anteil</th>
+  </tr></thead>
+  <tbody>{ep_rows}</tbody>
+</table>
+<div class="komhd">Kommentar</div>
+<div class="comment">{k4}</div>
+</div>"""
+
+    # ---- Seite 6: Ausblick + Außendienst ----
+    prog_rows = ''
+    for lbl, val in [('Konservativ (Q1 × 4)', prog_kons),
+                     ('Basis (Q1-Anteil 2025)', prog_basis),
+                     ('Optimistisch (Basis +5 %)', prog_opt)]:
+        wv = sign(pct(val, jsum2025))
+        prog_rows += (f'<tr><td>{lbl}</td><td><b>{fmtM(val)}</b></td>'
+                      f'<td style="color:{pos(wv)};font-weight:bold">{wv}</td></tr>')
+
+    ad_rows = ''
+    for x in ad:
+        c = sign(pct(x['a'], x['b']))
+        ad_rows += (f'<tr><td>{x["n"]}</td><td>{fmtM(x["a"])}</td>'
+                    f'<td>{fmtM(x["b"])}</td>'
+                    f'<td style="color:{pos(c)};font-weight:bold">{c}</td></tr>')
+
+    he_html = ''.join(
+        f'<p class="bullet">· <b>{t}</b> {tx}</p>'
+        for t, tx in he)
+
+    s6 = f"""<div class="chapter">
+<h2>5. Ausblick und strategische Einschätzung</h2>
+<div class="chapter-sub">Jahresprognose {aktuell_jahr} (indikativ)</div>
+<p style="font-size:8.5pt;margin:0 0 8px">
+  Basierend auf dem Q1-Anteil am Jahresumsatz {vorjahr} (22,0 %) ergibt sich eine indikative
+  Jahresprognose {aktuell_jahr} von ca. {fmtM(prog_basis)}.
+  Wachstum ggü. Jahresumsatz {vorjahr} (27,25 Mio, €): {sign(pct(prog_basis, jsum2025))}.
+</p>
+<table class="dt">
+  <thead><tr>
+    <th>Szenario</th><th>Prognose Jahresumsatz {aktuell_jahr}</th>
+    <th>Wachstum ggü. {vorjahr}</th>
+  </tr></thead>
+  <tbody>{prog_rows}</tbody>
+</table>
+
+<div class="chapter-sub" style="margin-top:16px">Außendienst YTD</div>
+<table class="dt">
+  <thead><tr><th>Mitarbeiter</th><th>YTD {aktuell_jahr}</th><th>YTD {vorjahr}</th><th>vs. VJ</th></tr></thead>
+  <tbody>{ad_rows}</tbody>
+</table>
+<div class="komhd">Kommentar</div>
+<div class="comment">{ka}</div>
+
+<div class="chapter-sub" style="margin-top:16px">Strategische Handlungshinweise</div>
+{he_html}
+
+<p class="fn">Datenquelle: Qlik Sense Dashboard „Umsatz FR", nova:med GmbH &amp; Co. KG
+(Stand: {DATUM}). Alle Angaben in Euro netto.
+Vertraulich — ausschließlich für Gesellschafter und Beirat.</p>
+</div>"""
+
+    # ---- Fußzeile ----
+    ftr = f"""<div class="ftr"><div class="ftr-inner">
+  <div class="ftr-l">nova:med GmbH &amp; Co. KG · Höchstadt a. d. Aisch · www.novamed.de</div>
+  <div class="ftr-r">Vertraulich</div>
+</div></div>"""
+
+    return f"""<!DOCTYPE html>
+<html lang="de"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+{css}
+</head>
+<body>
+<div class="wrap">
+  {hdr}
+  {s1}{s2}{s3}{s4}{s5}{s6}
+  {ftr}
+</div>
+</body></html>"""
+
+
+@app.route('/generate-with-html', methods=['POST'])
+def generate_with_html():
+    """Gibt PDF (Base64) + HTML-Mail als JSON zurück — für n8n."""
+    key = request.headers.get('X-API-Key', '')
+    if key != API_KEY:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({'error': 'No JSON body'}), 400
+
+    try:
+        import base64
+        buf = build_pdf(data)
+        pdf_b64 = base64.b64encode(buf.read()).decode('utf-8')
+        html = build_html_email(data)
+        fn = data.get('fn', 'novamed_umsatzbericht.pdf')
+        return jsonify({
+            'pdf_base64': pdf_b64,
+            'html_email': html,
+            'fn': fn
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
